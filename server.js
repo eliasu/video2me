@@ -144,6 +144,8 @@ http.createServer(async (req, res) => {
   try {
     switch (url.pathname) {
       case '/': res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return fs.createReadStream(new URL('index.html', import.meta.url)).pipe(res);
+      case '/icon.svg': res.writeHead(200, { 'Content-Type': 'image/svg+xml' }); return fs.createReadStream(new URL('icon.svg', import.meta.url)).pipe(res);
+      case '/apple-touch-icon.png': res.writeHead(200, { 'Content-Type': 'image/png' }); return fs.createReadStream(new URL('apple-touch-icon.png', import.meta.url)).pipe(res);
       case '/api/list': return json(res, { dir: path.resolve(q.dir), files: await list(path.resolve(q.dir)) });
       case '/api/pick': {
         const { stdout } = await run('osascript', ['-e', 'POSIX path of (choose folder with prompt "Ordner wählen")']).catch(() => ({ stdout: '' }));

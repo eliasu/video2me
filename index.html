@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>video2me</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="video2me">
 <style>
 :root {
   --text: #1d1d1f; --muted: #6e6e73; --faint: #a1a1a6;
@@ -43,7 +46,6 @@ header, aside {
 /* toolbar */
 header { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 0 10px 0 20px; border-radius: 28px; z-index: 2; }
 .brand { font: 600 16px/1 -apple-system, "SF Pro Display", system-ui; letter-spacing: -.025em; margin-right: 10px; }
-.brand span { color: var(--accent); }
 .path { flex: 1; min-width: 0; height: 36px; padding: 0 16px; border-radius: 18px; border: 1px solid var(--line); background: rgba(255,255,255,.5); box-shadow: inset 0 1px 2px rgba(20,24,60,.04); }
 .path::placeholder { color: var(--faint); }
 .btn {
@@ -166,7 +168,7 @@ select.input { appearance: none; padding-right: 30px; background: rgba(255,255,2
 <body>
 
 <header>
-  <div class="brand">video<span>2</span>me</div>
+  <div class="brand">video2me</div>
   <button class="btn" id="pick">Ordner öffnen…</button>
   <input class="path" id="dir" placeholder="/Pfad/zum/Ordner – Enter zum Laden" spellcheck="false">
   <div class="overall" id="overall"><span class="num" id="overallText"></span><div class="bar"><i id="overallBar"></i></div><button class="btn" id="cancel">Abbrechen</button></div>
