@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>video2me</title>
+<style>
+:root {
+  --text: #1d1d1f; --muted: #6e6e73; --faint: #a1a1a6;
+  --glass: rgba(255,255,255,.52); --glass-strong: rgba(255,255,255,.78);
+  --rim: rgba(255,255,255,.85); --line: rgba(20,24,40,.07); --fill: rgba(20,24,40,.05);
+  --accent: #0071e3; --accent-soft: rgba(0,113,227,.1); --ok: #248a3d; --err: #d70015; --trim: #ffcc00;
+  --blur: blur(40px) saturate(190%);
+  --lift: inset 0 1px 0 rgba(255,255,255,.95), inset 0 0 0 1px rgba(255,255,255,.35), 0 1px 2px rgba(20,24,60,.04), 0 12px 40px -8px rgba(20,24,60,.12);
+  --r: 24px;
+  color-scheme: light;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font: 13px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+  letter-spacing: -.005em; color: var(--text);
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  background:
+    radial-gradient(60vw 60vw at 0% 0%, #d9e8ff 0%, transparent 60%),
+    radial-gradient(50vw 50vw at 100% 10%, #f4e3ff 0%, transparent 60%),
+    radial-gradient(60vw 50vw at 80% 100%, #ffe8dc 0%, transparent 60%),
+    radial-gradient(50vw 50vw at 10% 100%, #dcf6ee 0%, transparent 60%),
+    #f2f3f7;
+  display: grid; grid-template: 56px 1fr / 300px 1fr 300px; gap: 12px; padding: 12px; overflow: hidden;
+}
+.num { font-variant-numeric: tabular-nums; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: none; }
+:focus-visible { outline: 3px solid rgba(0,113,227,.3); outline-offset: 1px; border-radius: 10px; }
+
+/* glass surfaces */
+header, aside {
+  background: var(--glass); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  border: 1px solid var(--rim); box-shadow: var(--lift); border-radius: var(--r);
+}
+
+/* toolbar */
+header { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 0 10px 0 20px; border-radius: 28px; z-index: 2; }
+.brand { font: 600 16px/1 -apple-system, "SF Pro Display", system-ui; letter-spacing: -.025em; margin-right: 10px; }
+.brand span { color: var(--accent); }
+.path { flex: 1; min-width: 0; height: 36px; padding: 0 16px; border-radius: 18px; border: 1px solid var(--line); background: rgba(255,255,255,.5); box-shadow: inset 0 1px 2px rgba(20,24,60,.04); }
+.path::placeholder { color: var(--faint); }
+.btn {
+  height: 36px; padding: 0 16px; border-radius: 18px; font-weight: 500; white-space: nowrap;
+  background: var(--glass-strong); border: 1px solid var(--rim);
+  box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(20,24,60,.06), 0 4px 12px -4px rgba(20,24,60,.1);
+  transition: transform .15s, box-shadow .15s, opacity .15s;
+}
+.btn:hover { background: #fff; }
+.btn:active { transform: scale(.97); }
+.btn.primary { color: #fff; border-color: rgba(255,255,255,.3); background: linear-gradient(180deg, #2b8cff, #0071e3); box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 6px 16px -4px rgba(0,113,227,.5); }
+.btn:disabled { opacity: .4; cursor: default; transform: none; }
+.overall { display: none; align-items: center; gap: 10px; color: var(--muted); }
+.overall.on { display: flex; }
+.bar { height: 4px; border-radius: 2px; background: var(--fill); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #5aa9ff, var(--accent)); border-radius: 2px; transition: width .3s; }
+.overall .bar { width: 140px; }
+
+/* sidebars */
+aside { overflow: auto; scrollbar-width: thin; scrollbar-color: rgba(20,24,40,.15) transparent; }
+.inspector { padding: 6px 20px 20px; }
+.list-head { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; padding: 16px 18px 10px; background: linear-gradient(var(--glass-strong) 60%, transparent); z-index: 1; }
+h2 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.link { color: var(--accent); font-weight: 500; font-size: 12px; }
+.files { list-style: none; padding: 0 8px 16px; }
+.folder { padding: 14px 12px 4px; font-size: 11.5px; font-weight: 600; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder::before { content: "▸ "; color: var(--faint); }
+.file { display: grid; grid-template-columns: 18px 1fr; gap: 2px 10px; align-items: center; padding: 9px 12px; border-radius: 14px; cursor: default; transition: background .15s; }
+.file:hover { background: rgba(255,255,255,.5); }
+.file.sel { background: rgba(255,255,255,.9); box-shadow: inset 0 1px 0 #fff, 0 2px 10px -2px rgba(20,24,60,.1); }
+.file .name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file .meta { grid-column: 2; font-size: 11.5px; color: var(--muted); display: flex; gap: 8px; }
+.file .meta b { font-weight: 500; }
+.file .meta .done { color: var(--ok); cursor: pointer; } .file .meta .err { color: var(--err); }
+.file .bar { grid-column: 2; margin-top: 4px; }
+.file .trimmed { color: #b38f00; }
+input[type=checkbox] { appearance: none; width: 17px; height: 17px; border-radius: 6px; border: 1px solid rgba(20,24,40,.2); background: rgba(255,255,255,.8); display: grid; place-content: center; cursor: pointer; }
+input[type=checkbox]:checked { background: var(--accent); border-color: var(--accent); }
+input[type=checkbox]:checked::after { content: ""; width: 8px; height: 4px; border: solid #fff; border-width: 0 0 2px 2px; transform: translateY(-1px) rotate(-45deg); }
+.empty { padding: 56px 24px; text-align: center; color: var(--muted); }
+.empty strong { display: block; color: var(--text); font: 600 17px/1.3 -apple-system, "SF Pro Display", system-ui; letter-spacing: -.02em; margin-bottom: 6px; }
+
+/* stage */
+main { display: flex; flex-direction: column; min-width: 0; padding: 4px 8px; gap: 16px; overflow: auto; }
+.viewer { position: relative; flex: 1; min-height: 200px; display: grid; place-items: center; border-radius: var(--r); background: #0d0d10; overflow: hidden; border: 1px solid rgba(255,255,255,.6); box-shadow: 0 20px 50px -12px rgba(20,24,60,.35); }
+video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.viewer.cover video { object-fit: cover; }
+.fit { position: absolute; top: 14px; right: 14px; z-index: 1; height: 30px; padding: 0 12px; border-radius: 15px; font-size: 12px; font-weight: 500; color: #fff;
+  background: rgba(40,40,46,.45); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(255,255,255,.18); display: flex; align-items: center; gap: 6px; }
+.fit svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.viewer .hint { color: #8e8e93; }
+.transport { display: flex; align-items: center; gap: 14px; }
+.play { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--glass-strong); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); border: 1px solid var(--rim); box-shadow: var(--lift); transition: transform .15s; }
+.play:active { transform: scale(.94); }
+.play svg { width: 15px; height: 15px; fill: currentColor; }
+.time { font: 500 17px/1 -apple-system, "SF Pro Display", system-ui; letter-spacing: -.02em; }
+.time small { color: var(--muted); font-weight: 400; font-size: 14px; }
+.transport .title { margin-left: auto; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.timeline { position: relative; height: 64px; margin: 0 14px; border-radius: 12px; background: #1c1c1e center / 100% 100% no-repeat; touch-action: none; user-select: none; cursor: pointer; box-shadow: 0 8px 24px -8px rgba(20,24,60,.3); }
+.shade { position: absolute; top: 0; bottom: 0; background: rgba(242,243,247,.72); pointer-events: none; }
+.shade.l { left: 0; border-radius: 12px 0 0 12px; } .shade.r { right: 0; border-radius: 0 12px 12px 0; }
+.range { position: absolute; top: -3px; bottom: -3px; border: 3px solid var(--trim); border-left-width: 0; border-right-width: 0; cursor: grab; }
+.range:active { cursor: grabbing; }
+.handle { position: absolute; top: -3px; bottom: -3px; width: 14px; background: var(--trim); cursor: ew-resize; display: grid; place-items: center; }
+.handle::after { content: ""; width: 2px; height: 18px; border-radius: 1px; background: rgba(0,0,0,.4); }
+.handle.in { left: -14px; border-radius: 8px 0 0 8px; } .handle.out { right: -14px; border-radius: 0 8px 8px 0; }
+.playhead { position: absolute; top: -12px; bottom: -8px; width: 18px; margin-left: -9px; cursor: ew-resize; }
+.playhead::before { content: ""; position: absolute; left: 7.5px; top: 4px; bottom: 0; width: 3px; background: #fff; border-radius: 2px; box-shadow: 0 0 0 .5px rgba(0,0,0,.25), 0 2px 6px rgba(0,0,0,.3); pointer-events: none; }
+.playhead::after { content: ""; position: absolute; left: 3px; top: 0; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 .5px rgba(0,0,0,.2), 0 2px 6px rgba(0,0,0,.3); pointer-events: none; }
+.timeline.off { opacity: .35; pointer-events: none; }
+.timeline.off > * { display: none; }
+
+.trimbar { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; padding: 14px 16px; border-radius: 20px; background: var(--glass); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); border: 1px solid var(--rim); box-shadow: var(--lift); }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label { font-size: 11.5px; color: var(--muted); font-weight: 500; }
+.input { height: 34px; width: 100%; padding: 0 12px; border-radius: 11px; border: 1px solid var(--line); background: rgba(255,255,255,.65); box-shadow: inset 0 1px 2px rgba(20,24,60,.04); transition: background .15s, border-color .15s; }
+.input:focus { background: #fff; border-color: rgba(0,113,227,.4); outline: none; box-shadow: 0 0 0 3px rgba(0,113,227,.15); }
+.trimbar .input { width: 104px; }
+.kbd { margin-left: auto; color: var(--muted); font-size: 11.5px; align-self: center; }
+kbd { font: 500 10.5px/1 -apple-system, system-ui; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line); background: rgba(255,255,255,.8); color: var(--muted); }
+
+/* inspector */
+.group { padding: 16px 0; border-bottom: 1px solid var(--line); display: grid; gap: 12px; }
+.group:last-child { border: 0; }
+.row { display: flex; gap: 10px; align-items: center; }
+.row > * { flex: 1; }
+.seg { display: flex; padding: 3px; border-radius: 13px; background: var(--fill); box-shadow: inset 0 1px 2px rgba(20,24,60,.05); }
+.seg label { flex: 1; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg span { display: block; text-align: center; padding: 5px 6px; border-radius: 10px; font-weight: 500; font-size: 12px; color: var(--muted); transition: background .2s, color .2s, box-shadow .2s; cursor: pointer; }
+.seg input:checked + span { background: #fff; color: var(--text); box-shadow: 0 1px 1px rgba(20,24,60,.06), 0 3px 8px -2px rgba(20,24,60,.15); }
+.seg input:focus-visible + span { outline: 3px solid rgba(0,113,227,.3); }
+select.input { appearance: none; padding-right: 30px; background: rgba(255,255,255,.65) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238e8e93' stroke-width='1.5' fill='none'/%3E%3C/svg%3E") no-repeat right 12px center; cursor: pointer; }
+.switch { display: flex; justify-content: space-between; align-items: center; }
+.switch input { appearance: none; width: 40px; height: 24px; border-radius: 12px; background: rgba(20,24,40,.12); position: relative; transition: background .2s; flex: none; cursor: pointer; }
+.switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.2); transition: transform .25s cubic-bezier(.3,1.4,.6,1); }
+.switch input:checked { background: #34c759; }
+.switch input:checked::after { transform: translateX(16px); }
+.hint { font-size: 11.5px; color: var(--muted); }
+.outname { font: 500 12px/1.45 ui-monospace, "SF Mono", Menlo, monospace; word-break: break-all; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.6); border: 1px solid var(--line); }
+.outname small { display: block; font: 11.5px -apple-system, system-ui; color: var(--muted); margin-top: 4px; }
+/* export summary */
+.toast {
+  position: fixed; left: 50%; top: 84px; transform: translateX(-50%); z-index: 5;
+  display: flex; align-items: center; gap: 20px; padding: 14px 14px 14px 24px; border-radius: 26px;
+  background: rgba(255,255,255,.7); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  border: 1px solid var(--rim); box-shadow: var(--lift), 0 24px 60px -12px rgba(20,24,60,.3);
+  animation: rise .45s cubic-bezier(.2,1.2,.4,1);
+}
+@keyframes rise { from { opacity: 0; transform: translate(-50%, -16px) scale(.97); } }
+.toast .pct { font: 700 34px/1 -apple-system, "SF Pro Display", system-ui; letter-spacing: -.04em; color: var(--ok); }
+.toast .pct.up { color: var(--err); }
+.toast strong { display: block; font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+.toast .sub { color: var(--muted); }
+.toast .close { width: 30px; height: 30px; border-radius: 50%; background: var(--fill); color: var(--muted); font-size: 15px; line-height: 1; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">video<span>2</span>me</div>
+  <button class="btn" id="pick">Ordner öffnen…</button>
+  <input class="path" id="dir" placeholder="/Pfad/zum/Ordner – Enter zum Laden" spellcheck="false">
+  <div class="overall" id="overall"><span class="num" id="overallText"></span><div class="bar"><i id="overallBar"></i></div><button class="btn" id="cancel">Abbrechen</button></div>
+  <button class="btn primary" id="export" disabled>Exportieren</button>
+</header>
+
+<aside class="sidebar">
+  <div class="list-head"><h2 id="count">Videos</h2><button class="link" id="all" hidden>Alle auswählen</button></div>
+  <ul class="files" id="files"></ul>
+  <div class="empty" id="empty"><strong>Kein Ordner geladen</strong>Öffne einen Ordner mit Videos, um sie für das Web zu konvertieren.</div>
+</aside>
+
+<main>
+  <div class="viewer" id="viewer"><button class="fit" id="fit" hidden><svg viewBox="0 0 16 16"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/></svg><span id="fitLabel">Füllen</span></button><video id="video" playsinline hidden></video><span class="hint" id="noVideo">Wähle links ein Video</span></div>
+  <div class="transport">
+    <button class="play" id="play" aria-label="Abspielen"><svg viewBox="0 0 14 14" id="playIcon"><path d="M3 1.5v11l9.5-5.5z"/></svg></button>
+    <div class="time num"><span id="now">0:00.00</span> <small>/ <span id="dur">0:00.00</span></small></div>
+    <div class="title" id="title"></div>
+  </div>
+  <div class="timeline off" id="timeline">
+    <div class="shade l" id="shadeL"></div><div class="shade r" id="shadeR"></div>
+    <div class="range" id="range" data-role="range"><div class="handle in" data-role="in"></div><div class="handle out" data-role="out"></div></div>
+    <div class="playhead" id="playhead" data-role="playhead"></div>
+  </div>
+  <div class="trimbar">
+    <div class="field"><label for="in">In</label><input class="input num" id="in"></div>
+    <div class="field"><label for="out">Out</label><input class="input num" id="out"></div>
+    <div class="field"><label for="len">Länge</label><input class="input num" id="len"></div>
+    <button class="btn" id="reset">Zurücksetzen</button>
+    <div class="kbd"><kbd>Leertaste</kbd> Play · <kbd>I</kbd> <kbd>O</kbd> In/Out · <kbd>←</kbd> <kbd>→</kbd> Frame · <kbd>F</kbd> Füllen</div>
+  </div>
+</main>
+
+<div class="toast" id="toast" role="status" hidden>
+  <div class="pct num" id="toastPct"></div>
+  <div><strong class="num" id="toastTitle"></strong><span class="sub num" id="toastSub"></span></div>
+  <button class="btn" id="toastReveal">Im Finder zeigen</button>
+  <button class="close" id="toastClose" aria-label="Schließen">✕</button>
+</div>
+
+<aside class="inspector">
+  <div class="group">
+    <h2>Preset</h2>
+    <select class="input" id="preset"></select>
+    <div class="row"><button class="btn" id="savePreset">Als Preset sichern</button><button class="btn" id="delPreset">Löschen</button></div>
+  </div>
+  <div class="group">
+    <h2>Format</h2>
+    <div class="seg" id="codec">
+      <label><input type="radio" name="codec" value="h264"><span>H.264</span></label>
+      <label><input type="radio" name="codec" value="hevc"><span>HEVC</span></label>
+      <label><input type="radio" name="codec" value="vp9"><span>VP9</span></label>
+      <label><input type="radio" name="codec" value="av1"><span>AV1</span></label>
+    </div>
+    <p class="hint" id="codecHint"></p>
+  </div>
+  <div class="group">
+    <h2>Maximale Größe</h2>
+    <div class="row">
+      <div class="field"><label for="maxW">Breite</label><input class="input num" id="maxW" type="number" min="2" step="2" placeholder="Original"></div>
+      <div class="field"><label for="maxH">Höhe</label><input class="input num" id="maxH" type="number" min="2" step="2" placeholder="Original"></div>
+    </div>
+    <p class="hint">Seitenverhältnis bleibt erhalten, es wird nie hochskaliert.</p>
+  </div>
+  <div class="group">
+    <h2>Qualität</h2>
+    <div class="seg" id="quality">
+      <label><input type="radio" name="quality" value="high"><span>Hoch</span></label>
+      <label><input type="radio" name="quality" value="mid"><span>Ausgewogen</span></label>
+      <label><input type="radio" name="quality" value="small"><span>Klein</span></label>
+    </div>
+    <label class="switch"><span>Ton entfernen</span><input type="checkbox" id="mute"></label>
+  </div>
+  <div class="group">
+    <h2>Ziel</h2>
+    <div class="seg">
+      <label><input type="radio" name="dest" value="same"><span>Gleicher Ordner</span></label>
+      <label><input type="radio" name="dest" value="other"><span>Anderer Ordner</span></label>
+    </div>
+    <div class="row" id="outDirRow"><input class="input" id="outDir" placeholder="/Pfad/zum/Export" spellcheck="false"><button class="btn" id="pickOut" style="flex:none">Wählen…</button></div>
+  </div>
+  <div class="group">
+    <h2>Dateiname</h2>
+    <div class="outname" id="outname">—</div>
+  </div>
+</aside>
+
+<script>
+const $ = s => document.querySelector(s);
+const video = $('#video'), tl = $('#timeline');
+const MIN = 0.1, FPS = 30;
+const CODECS = {
+  h264: { ext: 'mp4', hint: 'Läuft überall. Die sichere Wahl.' },
+  hevc: { ext: 'mp4', hint: 'Rund 40 % kleiner. Safari, Chrome & Edge mit Hardware-Support.' },
+  vp9:  { ext: 'webm', hint: 'Offenes Format. Chrome, Firefox, Edge, Safari 14+.' },
+  av1:  { ext: 'mp4', hint: 'Kleinste Dateien. Moderne Browser, langsam beim Encoden.' },
+};
+const BUILTIN = [
+  { name: 'Web · 1080p · H.264', codec: 'h264', maxW: 1920, maxH: 1080, quality: 'mid', mute: false },
+  { name: 'Hero-Loop · 1080p · stumm', codec: 'h264', maxW: 1920, maxH: 1080, quality: 'mid', mute: true },
+  { name: 'Mobil · 720p · H.264', codec: 'h264', maxW: 1280, maxH: 720, quality: 'mid', mute: false },
+  { name: 'Web · 1080p · VP9', codec: 'vp9', maxW: 1920, maxH: 1080, quality: 'mid', mute: false },
+  { name: 'Web · 1080p · AV1', codec: 'av1', maxW: 1920, maxH: 1080, quality: 'mid', mute: false },
+  { name: '4K · HEVC', codec: 'hevc', maxW: 3840, maxH: 2160, quality: 'high', mute: false },
+];
+
+// localStorage can throw (private mode etc.)
+const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+
+let files = [], cur = null, jobs = [], polling = null;
+let settings = Object.assign({ ...BUILTIN[0], preset: BUILTIN[0].name, dest: 'same', outDir: '' }, store.get('settings', {}));
+let custom = store.get('presets', []);
+
+// ---------- helpers ----------
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = t => { t = Math.max(0, t || 0); const m = Math.floor(t / 60), s = t - m * 60; return `${m}:${s.toFixed(2).padStart(5, '0')}`; };
+const parse = s => { const p = String(s).trim().replace(',', '.').split(':').map(Number); return p.some(isNaN) ? NaN : p.reduce((a, v) => a * 60 + v, 0); };
+const size = b => b > 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b > 1e6 ? (b / 1e6).toFixed(1) + ' MB' : Math.round(b / 1e3) + ' KB';
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const slug = s => s.replace(/\.[^.]+$/, '').normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/ß/g, 'ss')
+  .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'video';
+const api = async (url, data) => {
+  const r = await fetch(url, data && { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  const j = await r.json(); if (!r.ok) throw new Error(j.error); return j;
+};
+
+function dims(f) {
+  const r = Math.min(1, (settings.maxW || Infinity) / f.w, (settings.maxH || Infinity) / f.h);
+  const even = v => Math.max(2, Math.round(v * r / 2) * 2);
+  return { w: even(f.w), h: even(f.h) };
+}
+// e.g. "Sommer Kampagne FINAL.mov" → "sommer-kampagne-final_1920w_h264.mp4"
+const outName = f => `${slug(f.name)}_${dims(f).w}w_${settings.codec}${settings.mute ? '_muted' : ''}.${CODECS[settings.codec].ext}`;
+
+// ---------- folder ----------
+async function load(dir) {
+  if (!dir) return;
+  try {
+    const r = await api('/api/list?dir=' + encodeURIComponent(dir));
+    $('#dir').value = r.dir;
+    store.set('dir', r.dir);
+    files = r.files.map(f => ({ ...f, in: 0, out: f.duration, checked: false }));
+    renderList();
+    select(files[0] || null);
+  } catch (e) { alert('Ordner konnte nicht geladen werden:\n' + e.message); }
+}
+$('#pick').onclick = async () => { const { dir } = await api('/api/pick'); if (dir) load(dir); };
+$('#dir').onkeydown = e => e.key === 'Enter' && load(e.target.value.trim());
+
+function jobFor(f) { for (let i = jobs.length; i--;) if (jobs[i].src === f.path) return jobs[i]; }
+
+function renderList() {
+  $('#empty').hidden = files.length > 0;
+  $('#all').hidden = !files.length;
+  $('#count').textContent = files.length ? `${files.length} Video${files.length > 1 ? 's' : ''}` : 'Videos';
+  $('#all').textContent = files.length && files.every(f => f.checked) ? 'Keine auswählen' : 'Alle auswählen';
+  $('#files').innerHTML = files.map((f, i) => {
+    const j = jobFor(f), trimmed = f.in > 0.01 || f.out < f.duration - 0.01;
+    let status = '';
+    if (j?.status === 'running' || j?.status === 'queued') status = `<b>${j.status === 'queued' ? 'Wartet' : Math.round(j.progress * 100) + ' %'}</b>`;
+    else if (j?.status === 'done') status = `<b class="done">✓ ${size(j.outSize)} · −${Math.max(0, Math.round((1 - j.outSize / j.srcSize) * 100))} %</b>`;
+    else if (j?.status === 'error') status = `<b class="err" title="${esc(j.error || '')}">Fehler</b>`;
+    const head = f.folder && f.folder !== files[i - 1]?.folder ? `<li class="folder" title="${esc(f.folder)}">${esc(f.folder)}</li>` : '';
+    return head + `<li class="file${f === cur ? ' sel' : ''}" data-i="${i}">
+      <input type="checkbox" ${f.checked ? 'checked' : ''} aria-label="Für Export auswählen">
+      <span class="name" title="${esc(f.name)}">${esc(f.name)}</span>
+      <span class="meta num"><span>${f.w}×${f.h}</span><span>${fmt(f.duration).replace(/\.\d+$/, '')}</span><span>${size(f.size)}</span>${trimmed ? '<span class="trimmed">✂︎</span>' : ''}${status}</span>
+      ${j?.status === 'running' || j?.status === 'queued' ? `<div class="bar"><i style="width:${j.progress * 100}%"></i></div>` : ''}
+    </li>`;
+  }).join('');
+  const n = files.filter(f => f.checked).length;
+  $('#export').disabled = !cur;
+  $('#export').textContent = n ? `${n} Video${n > 1 ? 's' : ''} exportieren` : 'Exportieren';
+}
+$('#files').onclick = e => {
+  const li = e.target.closest('.file'); if (!li) return;
+  const f = files[li.dataset.i];
+  if (e.target.type === 'checkbox') { f.checked = e.target.checked; renderList(); }
+  else if (e.target.closest('.done')) { const j = jobFor(f); api('/api/reveal', { path: j.out }); }
+  else select(f);
+};
+$('#all').onclick = () => { const v = !files.every(f => f.checked); files.forEach(f => f.checked = v); renderList(); };
+
+// ---------- player & trim ----------
+function select(f) {
+  cur = f;
+  video.hidden = $('#fit').hidden = !f; $('#noVideo').hidden = !!f;
+  tl.classList.toggle('off', !f);
+  $('#title').textContent = f?.name || '';
+  if (f) {
+    video.src = '/video?path=' + encodeURIComponent(f.path);
+    tl.style.backgroundImage = `url("/api/strip?path=${encodeURIComponent(f.path)}&d=${f.duration}")`;
+    $('#dur').textContent = fmt(f.duration);
+  } else { video.removeAttribute('src'); tl.style.backgroundImage = ''; }
+  renderList(); renderTrim(); renderOut();
+}
+video.onerror = () => { if (cur) $('#noVideo').hidden = false, $('#noVideo').textContent = 'Vorschau im Browser nicht möglich – Export funktioniert trotzdem.'; };
+video.onloadeddata = () => { $('#noVideo').textContent = 'Wähle links ein Video'; video.currentTime = cur.in; };
+
+function renderTrim() {
+  const f = cur, d = f?.duration || 1, pct = t => (t / d * 100) + '%';
+  const a = f ? f.in : 0, b = f ? f.out : d;
+  $('#range').style.left = pct(a); $('#range').style.width = pct(b - a);
+  $('#shadeL').style.width = pct(a); $('#shadeR').style.width = pct(d - b);
+  for (const [id, v] of [['in', a], ['out', b], ['len', b - a]]) if (document.activeElement !== $('#' + id)) $('#' + id).value = f ? fmt(v) : '';
+  renderList();
+}
+
+(function tick() {
+  if (cur) {
+    const t = video.currentTime;
+    if (!video.paused && t >= cur.out) video.currentTime = cur.in; // loop inside the trim range
+    $('#playhead').style.left = (t / (cur.duration || 1) * 100) + '%';
+    $('#now').textContent = fmt(t);
+  }
+  requestAnimationFrame(tick);
+})();
+
+let cover = store.get('cover', false);
+function renderFit() {
+  $('#viewer').classList.toggle('cover', cover);
+  $('#fitLabel').textContent = cover ? 'Einpassen' : 'Füllen';
+  $('#fit').title = cover ? 'Ganzes Bild zeigen' : 'Rahmen ausfüllen';
+}
+$('#fit').onclick = () => { cover = !cover; store.set('cover', cover); renderFit(); };
+renderFit();
+
+function togglePlay() {
+  if (!cur) return;
+  if (video.paused) { if (video.currentTime < cur.in || video.currentTime >= cur.out - 0.05) video.currentTime = cur.in; video.play(); }
+  else video.pause();
+}
+video.onplay = video.onpause = () => $('#playIcon').innerHTML = video.paused ? '<path d="M3 1.5v11l9.5-5.5z"/>' : '<path d="M2.5 1.5h3v11h-3zM8.5 1.5h3v11h-3z"/>';
+$('#play').onclick = togglePlay;
+video.onclick = togglePlay;
+
+tl.onpointerdown = e => {
+  if (!cur) return;
+  const role = e.target.dataset.role, rect = tl.getBoundingClientRect(), d = cur.duration;
+  const at = x => clamp((x - rect.left) / rect.width, 0, 1) * d;
+  const start = { x: e.clientX, in: cur.in, out: cur.out };
+  const move = ev => {
+    if (role === 'in') video.currentTime = cur.in = clamp(at(ev.clientX), 0, cur.out - MIN);
+    else if (role === 'out') video.currentTime = cur.out = clamp(at(ev.clientX), cur.in + MIN, d);
+    else if (role === 'range') {
+      const len = start.out - start.in;
+      cur.in = clamp(start.in + (ev.clientX - start.x) / rect.width * d, 0, d - len);
+      cur.out = cur.in + len;
+      video.currentTime = cur.in;
+    } else video.currentTime = at(ev.clientX); // playhead or empty track: scrub
+    renderTrim();
+  };
+  const wasPlaying = !video.paused;
+  video.pause();
+  if (!role) move(e);
+  tl.setPointerCapture(e.pointerId);
+  tl.onpointermove = move;
+  tl.onpointerup = ev => {
+    tl.onpointermove = null;
+    // a click (no drag) inside the yellow range seeks instead of moving it
+    if (role === 'range' && Math.abs(ev.clientX - start.x) < 3) video.currentTime = at(ev.clientX);
+    if (wasPlaying && (role === 'playhead' || !role)) video.play();
+  };
+};
+
+function setTrim(which, v) {
+  const f = cur, d = f.duration;
+  if (isNaN(v)) return renderTrim();
+  if (which === 'in') f.in = clamp(v, 0, f.out - MIN);
+  if (which === 'out') f.out = clamp(v, f.in + MIN, d);
+  if (which === 'len') { const len = clamp(v, MIN, d); f.out = f.in + len; if (f.out > d) { f.out = d; f.in = d - len; } }
+  video.currentTime = which === 'out' ? f.out : f.in;
+  renderTrim();
+}
+for (const id of ['in', 'out', 'len']) {
+  const el = $('#' + id);
+  el.onchange = () => cur && setTrim(id, parse(el.value));
+  el.onkeydown = e => e.key === 'Enter' && el.blur();
+  el.onblur = renderTrim;
+}
+$('#reset').onclick = () => { if (cur) { cur.in = 0; cur.out = cur.duration; renderTrim(); } };
+
+document.onkeydown = e => {
+  if (!cur || e.target.matches('input:not([type=checkbox]):not([type=radio]), select') || e.metaKey || e.ctrlKey) return;
+  const k = e.key.toLowerCase();
+  if (k === ' ') { e.preventDefault(); togglePlay(); }
+  else if (k === 'f') $('#fit').click();
+  else if (k === 'i') setTrim('in', video.currentTime);
+  else if (k === 'o') setTrim('out', video.currentTime);
+  else if (k === 'arrowleft' || k === 'arrowright') { e.preventDefault(); video.pause(); video.currentTime += (k === 'arrowleft' ? -1 : 1) * (e.shiftKey ? 1 : 1 / FPS); }
+  else if (k === 'arrowup' || k === 'arrowdown') { e.preventDefault(); const i = clamp(files.indexOf(cur) + (k === 'arrowup' ? -1 : 1), 0, files.length - 1); select(files[i]); }
+};
+
+// ---------- settings & presets ----------
+const allPresets = () => [...BUILTIN, ...custom];
+function renderPresets() {
+  $('#preset').innerHTML = `<optgroup label="Standard">${BUILTIN.map(p => `<option>${esc(p.name)}</option>`).join('')}</optgroup>`
+    + (custom.length ? `<optgroup label="Eigene">${custom.map(p => `<option>${esc(p.name)}</option>`).join('')}</optgroup>` : '')
+    + `<option value="">Benutzerdefiniert</option>`;
+  $('#preset').value = settings.preset;
+  $('#delPreset').disabled = !custom.some(p => p.name === settings.preset);
+}
+function renderSettings() {
+  document.querySelector(`[name=codec][value=${settings.codec}]`).checked = true;
+  document.querySelector(`[name=quality][value=${settings.quality}]`).checked = true;
+  document.querySelector(`[name=dest][value=${settings.dest}]`).checked = true;
+  $('#maxW').value = settings.maxW || ''; $('#maxH').value = settings.maxH || '';
+  $('#mute').checked = settings.mute;
+  $('#outDir').value = settings.outDir;
+  $('#outDirRow').hidden = settings.dest !== 'other';
+  $('#codecHint').textContent = CODECS[settings.codec].hint;
+  renderPresets(); renderOut();
+  store.set('settings', settings);
+}
+function renderOut() {
+  if (!cur) return $('#outname').textContent = '—';
+  const { w, h } = dims(cur);
+  $('#outname').innerHTML = `${esc(outName(cur))}<small class="num">${w}×${h} · ${fmt(cur.out - cur.in)} · ${settings.dest === 'other' && settings.outDir ? esc(settings.outDir) : 'neben dem Original'}</small>`;
+}
+function change(patch, keepPreset) { Object.assign(settings, patch); if (!keepPreset) settings.preset = ''; renderSettings(); }
+
+$('#preset').onchange = e => { const p = allPresets().find(p => p.name === e.target.value); change({ ...p, preset: p?.name || '' }, true); };
+document.querySelectorAll('[name=codec],[name=quality]').forEach(el => el.onchange = () => change({ [el.name]: el.value }));
+document.querySelectorAll('[name=dest]').forEach(el => el.onchange = () => change({ dest: el.value }, true));
+$('#maxW').oninput = e => change({ maxW: +e.target.value || 0 });
+$('#maxH').oninput = e => change({ maxH: +e.target.value || 0 });
+$('#mute').onchange = e => change({ mute: e.target.checked });
+$('#outDir').onchange = e => change({ outDir: e.target.value.trim() }, true);
+$('#pickOut').onclick = async () => { const { dir } = await api('/api/pick'); if (dir) change({ outDir: dir }, true); };
+$('#savePreset').onclick = () => {
+  const name = prompt('Name für das Preset:', settings.preset || ''); if (!name) return;
+  const { codec, maxW, maxH, quality, mute } = settings;
+  custom = [...custom.filter(p => p.name !== name), { name, codec, maxW, maxH, quality, mute }];
+  store.set('presets', custom); change({ preset: name }, true);
+};
+$('#delPreset').onclick = () => { custom = custom.filter(p => p.name !== settings.preset); store.set('presets', custom); change({ preset: '' }, true); };
+
+// ---------- export & progress ----------
+$('#export').onclick = async () => {
+  const sel = files.filter(f => f.checked);
+  const targets = sel.length ? sel : [cur];
+  if (settings.dest === 'other' && !settings.outDir) return alert('Bitte einen Zielordner wählen.');
+  try {
+    await api('/api/convert', {
+      codec: settings.codec, quality: settings.quality, mute: settings.mute,
+      outDir: settings.dest === 'other' ? settings.outDir : null,
+      items: targets.map(f => ({ src: f.path, name: outName(f), ...dims(f), inPoint: f.in, outPoint: f.out })),
+    });
+    $('#toast').hidden = true;
+    poll();
+  } catch (e) { alert(e.message); }
+};
+$('#cancel').onclick = () => api('/api/cancel', {}).then(poll);
+
+let batchFrom = null;
+function summary(batch) {
+  const done = batch.filter(j => j.status === 'done'), failed = batch.filter(j => j.status === 'error').length;
+  if (!done.length) return;
+  const src = done.reduce((a, j) => a + j.srcSize, 0), out = done.reduce((a, j) => a + j.outSize, 0);
+  const pct = Math.round((1 - out / src) * 100);
+  $('#toastPct').textContent = (pct >= 0 ? '−' : '+') + Math.abs(pct) + ' %';
+  $('#toastPct').classList.toggle('up', pct < 0);
+  $('#toastTitle').textContent = pct >= 0 ? `${size(src - out)} gespart` : `${size(out - src)} größer`;
+  $('#toastSub').textContent = `${done.length} Video${done.length > 1 ? 's' : ''} · ${size(src)} → ${size(out)}` + (failed ? ` · ${failed} fehlgeschlagen` : '');
+  $('#toastReveal').onclick = () => api('/api/reveal', { path: done[0].out });
+  $('#toast').hidden = false;
+}
+$('#toastClose').onclick = () => $('#toast').hidden = true;
+async function poll() {
+  clearTimeout(polling);
+  jobs = await api('/api/jobs').catch(() => jobs);
+  const active = jobs.filter(j => j.status === 'queued' || j.status === 'running');
+  if (active.length) {
+    batchFrom ??= jobs.indexOf(active[0]);
+    const batch = jobs.slice(batchFrom);
+    const doneShare = batch.reduce((a, j) => a + (j.status === 'queued' ? 0 : j.status === 'running' ? j.progress : 1), 0);
+    $('#overallText').textContent = `${batch.length - active.length + 1} von ${batch.length}`;
+    $('#overallBar').style.width = doneShare / batch.length * 100 + '%';
+    polling = setTimeout(poll, 400);
+  } else if (batchFrom !== null) { summary(jobs.slice(batchFrom)); batchFrom = null; }
+  $('#overall').classList.toggle('on', active.length > 0);
+  renderList();
+}
+
+// ---------- init ----------
+renderSettings();
+if (store.get('dir')) load(store.get('dir'));
+poll();
+</script>
+</body>
+</html>
